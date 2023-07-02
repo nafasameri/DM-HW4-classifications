@@ -1,0 +1,10 @@
+Jaccard similarity score: 0.7885230598295146
+Confusion matrix: {'Real Pos': {'tp': 0, 'fn': 152}, 'Real Neg': {'fp': 0, 'tn': 1205}}
+ACCURACY: 0.887988209285188
+SENSITIVITY: 0.0
+SPECIFICITY: 1.0
+PRECISION: 0
+NPV: 0.887988209285188
+Error Rate: 0.11201179071481208
+The Matthews correlation coefficient: 0.0
+F1 score: 0.0

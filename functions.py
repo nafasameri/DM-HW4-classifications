@@ -2,13 +2,12 @@ import dtreeviz
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib.colors import ListedColormap
 
 from sklearn import svm
 from sklearn import tree
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import confusion_matrix, jaccard_score
-from sklearn.metrics import matthews_corrcoef, precision_recall_curve
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import roc_auc_score, confusion_matrix, jaccard_score
+from sklearn.metrics import matthews_corrcoef, precision_recall_curve, classification_report
 
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.feature_selection import SelectKBest, chi2
@@ -16,20 +15,16 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import train_test_split, KFold, GridSearchCV
 
 
 def read_data(filename):
     data = pd.read_csv(filename, sep=';')
-    # X = data.iloc[:, :-1]
-    # Y = data.iloc[:, -1]
-
     return data
 
 
 def preproccessing(data):
-    # پیش‌پردازش داده
+    # print(data.isnull().sum())
     # jobs = data.groupby('job')['job'].head()
     jobs = data['job'].value_counts().index
     job_labels = {job: i for i, job in enumerate(jobs)}
@@ -60,6 +55,7 @@ def preproccessing(data):
 
     ys = data['y'].value_counts().index
     y_labels = {y: i for i, y in enumerate(ys)}
+    print('y_labels', y_labels)
 
     # تبدیل مقادیر رشته‌ای به برچسب‌های عددی
     data["job"] = data["job"].map(job_labels)
@@ -75,92 +71,84 @@ def preproccessing(data):
 
     X = data.iloc[:, :-1]
     Y = data.iloc[:, -1]
-
-    # imputer = SimpleImputer(strategy='median')
-    # X = imputer.fit_transform(X)
-    # weights = weights.tolist()
-    # X = X * weights
-    # X = pd.DataFrame(X)
     return X, Y
 
 
 def normalize(data):
-    # ایجاد یک نرمال‌سازی‌کننده
     scaler = MinMaxScaler()
 
-    # نرمال‌سازی ویژگی‌های عددی
     numeric_features = ['age', 'balance', 'day', 'duration', 'campaign', 'pdays', 'previous']
     data[numeric_features] = scaler.fit_transform(data[numeric_features])
 
     return data
 
 
-def split_data(X, Y, Percent):
-    train_size = Percent / 100
-    X_Train, X_Test, Y_Train, Y_Test = train_test_split(X, Y, train_size=train_size, random_state=42)
+def split_data(X, Y, k=5):
+    X_Train, X_Test, Y_Train, Y_Test = [], [], [], []
+    kfold = KFold(n_splits=k, shuffle=True, random_state=42)
+    for train_index, test_index in kfold.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = Y[train_index], Y[test_index]
 
-    print("Number of train data:", len(X_Train))
-    print("Number of test data:", len(X_Test))
+        X_Train.append(X_train)
+        X_Test.append(X_test)
+        Y_Train.append(y_train)
+        Y_Test.append(y_test)
+
+    print("Number of train data:", np.array(X_Train).shape)
+    print("Number of test data:", np.array(X_Test).shape)
+
+    # train_size = Percent / 100
+    # X_Train, X_Test, Y_Train, Y_Test = train_test_split(X, Y, train_size=train_size, random_state=42)
+    # print("Number of train data:", len(X_Train))
+    # print("Number of test data:", len(X_Test))
 
     return X_Train, X_Test, Y_Train, Y_Test
 
 
 def selectFeatures(X, y):
     # انتخاب ویژگی‌های مهم
-    selector = SelectKBest(score_func=chi2, k=5)  # انتخاب 5 ویژگی برتر
+    selector = SelectKBest(score_func=chi2, k=10)  # انتخاب 10 ویژگی برتر
     X_new = selector.fit_transform(X, y)
 
-    # نمایش نام ویژگی‌های انتخاب شده
     selected_features = X.columns[selector.get_support()]
 
     return X_new, selected_features
 
 
 def decision_tree(X_Train, Y_Train):
-    # تعریف مدل درخت تصمیم
     model_dt = DecisionTreeClassifier(criterion='entropy')
-
-    # آموزش مدل بر روی داده‌های آموزش
     model_dt.fit(X_Train, Y_Train)
 
-    # viz = dtreeviz.model(model_dt, X_Train, Y_Train)
-    # v = viz.view()
-    # v.save("Decision tree.svg")
+    viz = dtreeviz.model(model_dt, X_Train, Y_Train)
+    v = viz.view()
+    v.save("Decision tree.svg")
 
-    plt.figure(figsize=(200, 150))
-    tree.plot_tree(model_dt, filled=True)
-    plt.title("Decision tree trained")
-    plt.savefig("Decision-Tree.png")
-    plt.show()
+    # plt.figure(figsize=(200, 150))
+    # tree.plot_tree(model_dt, filled=True)
+    # plt.title("Decision tree trained")
+    # plt.savefig("Decision-Tree.png")
+    # plt.show()
 
     # text_representation = tree.export_text(model_dt)
-    # print(text_representation)
+    # print('text_representation:', text_representation)
+
+    # from sklearn.inspection import DecisionBoundaryDisplay
+    # feature_1, feature_2 = np.meshgrid(np.linspace(iris.data[:, 0].min(), iris.data[:, 0].max()), np.linspace(iris.data[:, 1].min(), iris.data[:, 1].max()))
+    # grid = np.vstack([feature_1.ravel(), feature_2.ravel()]).T
+    # tree = DecisionTreeClassifier().fit(iris.data[:, :2], iris.target)
+    # y_pred = np.reshape(tree.predict(grid), feature_1.shape)
+    # display = DecisionBoundaryDisplay(xx0 = feature_1, xx1 = feature_2, response = y_pred)
+    # display.plot()
+    # display.ax_.scatter(iris.data[:, 0], iris.data[:, 1], c = iris.target, edgecolor = "black")
+    # plt.show()
 
     return model_dt
 
 
 def gaussian(X_train, y_train):
-    # تعریف مدل بیزین ساده
     model_nb = GaussianNB()
-
-    # آموزش مدل بر روی داده‌های آموزش
     model_nb.fit(X_train, y_train)
-
-    # # پیش‌بینی بر روی داده‌های آزمون
-    # y_pred_nb = model_nb.predict(X_test)
-    #
-    # # ارزیابی مدل
-    # accuracy_nb = accuracy_score(y_test, y_pred_nb)
-    # confusion_matrix_nb = confusion_matrix(y_test, y_pred_nb)
-    # classification_report_nb = classification_report(y_test, y_pred_nb)
-    #
-    # # نمایش نتایج
-    # print("Accuracy:", accuracy_nb)
-    # print("Confusion Matrix:")
-    # print(confusion_matrix_nb)
-    # print("Classification Report:")
-    # print(classification_report_nb)
-
     return model_nb
 
 
@@ -170,10 +158,8 @@ def SVM(X_Train, Y_Train):
 
 
 def KNN(X_Train, Y_Train):
-    # تعریف مدل k نزدیک‌ترین همسایه
     model_knn = KNeighborsClassifier()
 
-    # تعیین مقادیر مختلف برای k
     param_grid = {'n_neighbors': range(1, 20)}
 
     # جستجوی شبکه برای پیدا کردن مقدار k بهینه
@@ -190,28 +176,12 @@ def KNN(X_Train, Y_Train):
     # آموزش مدل بر روی داده‌های آموزش
     model_knn.fit(X_Train, Y_Train)
 
-    # # پیش‌بینی بر روی داده‌های آزمون
-    # y_pred_knn = model_knn.predict(X_test)
-    #
-    # # ارزیابی مدل
-    # accuracy_knn = accuracy_score(y_test, y_pred_knn)
-    # confusion_matrix_knn = confusion_matrix(y_test, y_pred_knn)
-    # classification_report_knn = classification_report(y_test, y_pred_knn)
-    #
-    # # نمایش نتایج
-    # print("Best k:", best_k)
-    # print("Accuracy:", accuracy_knn)
-    # print("Confusion Matrix:")
-    # print(confusion_matrix_knn)
-    # print("Classification Report:")
-    # print(classification_report_knn)
-
     return model_knn
 
 
 def test_data(clf, X_Test, Y_Test, method):
     y_pred = clf.predict(X_Test)
-    print("prediction labels:", y_pred)
+    # print("prediction labels:", y_pred)
 
     from sklearn.metrics import roc_curve
     fpr, tpr, thresholds = roc_curve(Y_Test, y_pred)
@@ -222,8 +192,8 @@ def test_data(clf, X_Test, Y_Test, method):
     plt.xlabel("FPR (False Positive Rate)")
     plt.ylabel("TPR (True Positive Rate)")
     plt.legend(loc="lower right")
-    plt.savefig(method + "-ROC.png")
-    plt.show()
+    plt.savefig('results/' + method + "-ROC.png")
+    # plt.show()
 
     precision, recall, thresholds = precision_recall_curve(Y_Test, y_pred)
     precision = np.fliplr([precision])[0]  # so the array is increasing (you won't get negative AUC)
@@ -236,9 +206,8 @@ def test_data(clf, X_Test, Y_Test, method):
     plt.xlabel("Recall")
     plt.ylabel("Precision")
     plt.legend(loc="lower right")
-    plt.savefig(method + "-Precision_recall.png")
-    plt.show()
-
+    plt.savefig('results/' + method + "-Precision_recall.png")
+    # plt.show()
 
     confusion = confusion_matrix(Y_Test, y_pred)
     print("confusion_matrix: ", confusion)
@@ -285,7 +254,7 @@ def test_data(clf, X_Test, Y_Test, method):
     corrcoef = matthews_corrcoef(Y_Test, y_pred)
     print("The Matthews correlation coefficient: " + str(corrcoef))
 
-    file_perf = open(method + '-performances.txt', 'w')
+    file_perf = open('results/' + method + '-performances.txt', 'w')
     file_perf.write("Jaccard similarity score: " + str(jaccard_index)
                     + "\nConfusion matrix: " + str({"Real Pos": {"tp": tp, "fn": fn}, "Real Neg": {"fp": fp, "tn": tn}})
                     + "\nACCURACY: " + str(accuracy)
@@ -297,3 +266,11 @@ def test_data(clf, X_Test, Y_Test, method):
                     + "\nThe Matthews correlation coefficient: " + str(corrcoef)
                     + "\nF1 score: " + str(f1score))
     file_perf.close()
+
+    rep = classification_report(Y_Test, y_pred)
+    print(rep)
+    file_perf = open('results/' + method + '-classification_report.txt', 'w')
+    file_perf.write(rep)
+    file_perf.close()
+
+    return precision
